@@ -16,3 +16,16 @@
   background-color: #000000;
   color: #ffffff;
 }
+
+/* Kukan : palette de l'interface */
+:root {
+  --k-chrome: #F8F9FA;
+  --k-canvas: #F8F9FA;
+  --k-tab: #DEE2E6;
+  --k-border: #DEE2E6;
+  --k-border-strong: #CED4DA;
+  --k-muted: #A7AFB6;
+  --k-document: #F8F9FA;
+  --k-text: #212529;
+  --k-text-secondary: #6C757D;
+}
