@@ -10,15 +10,12 @@ import DrawingCanvas from "../../../components/DrawingCanvas";
 import MobileNav from "../../../components/MobileNav";
 
 export default function VectorizePage() {
-  const [user, setUser] = useState(null);
-  const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [lang] = useLanguage();
   const t = translations[lang].dashboard;
 
   const [sourceImageUrl, setSourceImageUrl] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
@@ -28,53 +25,23 @@ export default function VectorizePage() {
         router.push("/login");
         return;
       }
-      setUser(user);
-
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("*, plans(*)")
+        .select("is_deactivated")
         .eq("id", user.id)
         .single();
-
       if (profileData?.is_deactivated) {
         router.push("/account-deactivated");
         return;
-      }
-
-      if (profileData) {
-        const fullPlan = { ...profileData.plans, avatar_icon: profileData.avatar_icon };
-        setPlan(fullPlan);
       }
       setLoading(false);
     };
     load();
   }, [router]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push("/login");
-  };
-
   const loadImageFile = (file) => {
     if (!file || !file.type.startsWith("image/")) return;
-    setUploading(true);
-    const url = URL.createObjectURL(file);
-    setSourceImageUrl(url);
-    setUploading(false);
-  };
-
-  const handleFileSelect = (e) => {
-    loadImageFile(e.target.files?.[0]);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setDragActive(true);
-  };
-
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setDragActive(false);
+    setSourceImageUrl(URL.createObjectURL(file));
   };
 
   const handleDrop = (e) => {
@@ -83,17 +50,13 @@ export default function VectorizePage() {
     loadImageFile(e.dataTransfer.files?.[0]);
   };
 
-  const handleCanvasSave = (blob) => {
-    console.log("SVG/PNG pret, blob:", blob);
-  };
-
   if (loading) return null;
 
   if (sourceImageUrl) {
     return (
       <DrawingCanvas
         backgroundImageUrl={sourceImageUrl}
-        onSave={handleCanvasSave}
+        onSave={(blob) => console.log("SVG/PNG pret, blob:", blob)}
         onCancel={() => setSourceImageUrl(null)}
         t={t}
       />
@@ -102,23 +65,35 @@ export default function VectorizePage() {
 
   return (
     <main className="min-h-screen bg-[var(--k-canvas)] text-[var(--k-text)]">
-      <DashboardHeader plan={plan} userId={user?.id} avatarIcon={plan?.avatar_icon} onLogout={handleLogout} t={t} />
+      <DashboardHeader t={t} />
 
-      <div
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`max-w-2xl mx-auto px-6 py-16 my-8 text-center border-2 border-dashed rounded-lg transition-colors ${
-          dragActive ? "border-black bg-neutral-50" : "border-transparent"
-        }`}
-      >
-        <h1 className="text-2xl lg:text-4xl font-semibold mb-8">{t.vectorizeTitle}</h1>
-        <label className="inline-block cursor-pointer border-b border-black/20 hover:border-black/50 transition text-lg pb-1">
-          <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-          {uploading ? t.vectorizeLoading : t.vectorizeImport}
+      <section className="w-full max-w-3xl mx-auto px-6 py-8 lg:py-14">
+        <h1 className="text-2xl font-semibold mb-8 lg:mb-10">{t.vectorizeTitle}</h1>
+
+        <label
+          onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center justify-center gap-4 h-72 border border-dashed rounded-lg cursor-pointer transition-colors ${
+            dragActive
+              ? "border-[var(--k-text)] bg-[var(--k-tab)]"
+              : "border-[var(--k-muted)] hover:bg-[var(--k-tab)]/40"
+          }`}
+        >
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-[var(--k-text-secondary)]">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+            <path d="M12 16v-5M9.5 13.5L12 11l2.5 2.5" />
+          </svg>
+          <span className="text-base text-[var(--k-text)]">{t.vectorizeDropPrompt}</span>
+          <span className="font-mono text-[11px] uppercase tracking-widest text-[var(--k-text-secondary)]">PNG · JPG</span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => loadImageFile(e.target.files?.[0])}
+          />
         </label>
-        <p className="mt-3 text-sm text-neutral-500">{t.vectorizeDragHint}</p>
-      </div>
+      </section>
 
       <MobileNav t={t} />
       <div className="md:hidden h-16" />

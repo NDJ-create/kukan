@@ -78,7 +78,7 @@ export default function Sidebar({ plan, onNavigateProfile, onNavigateSettings, o
       className="hidden md:block relative shrink-0 bg-[var(--k-chrome)] border-r border-[var(--k-border)]"
       style={{ width: `${width}px` }}
     >
-      <div className="sticky top-0 flex flex-col gap-0.5 px-1.5 py-2" style={{ height: "calc(100vh - 43px)" }}>
+      <div className="sticky top-0 flex flex-col gap-0.5 px-1.5 py-2" style={{ height: "calc(100vh - var(--k-top))" }}>
         <NavItem
           onClick={onNavigateProfile}
           label={t.profileTitle}

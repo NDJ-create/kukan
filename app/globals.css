@@ -29,3 +29,7 @@
   --k-text: #212529;
   --k-text-secondary: #6C757D;
 }
+
+/* Hauteur du haut de page : header seul (mobile), header + barre de menus (ordinateur) */
+:root { --k-top: 32px; }
+@media (min-width: 768px) { :root { --k-top: 64px; } }

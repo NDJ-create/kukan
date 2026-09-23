@@ -38,9 +38,14 @@ export default function DashboardPage() {
   const [editingTarget, setEditingTarget] = useState(null);
   const [editorBackground, setEditorBackground] = useState(null);
   const [svgAUrl, setSvgAUrl] = useState(null);
+  const [formBottom, setFormBottom] = useState(null);
 
   const pollRef = useRef(null);
   const sessionRef = useRef(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "generate") setView("generate");
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -272,9 +277,9 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-[var(--k-canvas)] text-[var(--k-text)]">
-      <DashboardHeader t={t} onHome={() => setView("start")} />
+      <DashboardHeader t={t} onHome={() => setView("start")} onNewGeneration={() => setView("generate")} />
 
-      <div className="md:flex" style={{ minHeight: "calc(100vh - 43px)" }}>
+      <div className="md:flex" style={{ minHeight: "calc(100vh - var(--k-top))" }}>
 
         {view === "start" && (
           <StartScreen
@@ -299,7 +304,7 @@ export default function DashboardPage() {
             maxReached={maxReached}
             curve={curve}
             onCurveChange={setCurve}
-            onFileChange={handleFileChange} svgAUrl={svgAUrl} onSvgChange={handleSvgChange}
+            onFileChange={handleFileChange} onFormBottom={setFormBottom} formBottom={formBottom} svgAUrl={svgAUrl} onSvgChange={handleSvgChange}
             onIncrement={incrementIntermediates}
             onGenerate={handleGenerate}
             canGenerate={canGenerate}

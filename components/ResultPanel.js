@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import LoadingState from "./LoadingState";
+import { useAlignedHeight } from "../lib/useAlignedHeight";
 
-export default function ResultPanel({ status, outputGifUrl, genId, startedAt, resultError, session, onDeleted, t }) {
+export default function ResultPanel({ status, outputGifUrl, genId, startedAt, resultError, session, onDeleted, formBottom, t }) {
+  const { sectionRef, cardRef, height } = useAlignedHeight(formBottom);
   const [showFullscreen, setShowFullscreen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [shareMessage, setShareMessage] = useState(null);
@@ -58,14 +60,14 @@ export default function ResultPanel({ status, outputGifUrl, genId, startedAt, re
   );
 
   return (
-    <section className="px-6 py-6 text-[var(--k-text)]">
+    <section ref={sectionRef} className="px-6 py-6 text-[var(--k-text)]">
       <h2 className="font-display text-lg italic mb-5">{t.result}</h2>
 
-      <div className="border border-[var(--k-border-strong)] rounded-lg min-h-64 flex items-center justify-center text-center px-4 bg-[var(--k-document)]">
+      <div ref={cardRef} style={{ height }} className="border border-[var(--k-border-strong)] rounded-lg min-h-64 flex items-center justify-center text-center px-4 bg-[var(--k-document)]">
         {status === "pending" || status === "processing" ? (
           <LoadingState startedAt={startedAt} t={t} />
         ) : status === "completed" && outputGifUrl ? (
-          <img src={outputGifUrl} alt={t.result} className="max-h-64 object-contain" />
+          <img src={outputGifUrl} alt={t.result} className="max-h-full max-w-full object-contain p-4" />
         ) : status === "failed" ? (
           <span className="font-mono text-xs text-red-600">{resultError || t.genericError}</span>
         ) : (

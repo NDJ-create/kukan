@@ -5,13 +5,16 @@ import { DockviewReact } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import GenerationForm from "./GenerationForm";
 import ResultPanel from "./ResultPanel";
+import HiddenStrokesResult from "./HiddenStrokesResult";
 
 const GenerationFormPanel = (props) => <GenerationForm {...props.params} />;
 const ResultPanelPanel = (props) => <ResultPanel {...props.params} />;
+const HiddenResultPanel = (props) => <HiddenStrokesResult {...props.params} />;
 
 const components = {
   generationForm: GenerationFormPanel,
   resultPanel: ResultPanelPanel,
+  hiddenResult: HiddenResultPanel,
 };
 
 export default function DockableWorkspace(props) {
@@ -29,7 +32,7 @@ export default function DockableWorkspace(props) {
 
     event.api.addPanel({
       id: "resultPanel",
-      component: "resultPanel",
+      component: props.mode === "hidden" ? "hiddenResult" : "resultPanel",
       title: props.t.result,
       params: props,
       position: {
@@ -54,7 +57,7 @@ export default function DockableWorkspace(props) {
   });
 
   return (
-    <div className="flex-1" style={{ height: "calc(100vh - 43px)", width: "100%" }}>
+    <div className="flex-1" style={{ height: "calc(100vh - var(--k-top))", width: "100%" }}>
       <DockviewReact
         components={components}
         onReady={onReady}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EasingSlider from "./EasingSlider";
 
 const DocIcon = ({ size = 30 }) => (
@@ -74,14 +74,29 @@ export default function GenerationForm({
   numIntermediates, plan, maxReached,
   curve, onCurveChange,
   onFileChange, onIncrement, onGenerate,
-  canGenerate, generating, resultError, t,
+  canGenerate, generating, resultError, generateLabel, onFormBottom, t,
 }) {
   const [dragOver, setDragOver] = useState(null);
+  const sectionRef = useRef(null);
+  const buttonRef = useRef(null);
+
+  useEffect(() => {
+    if (!onFormBottom) return;
+    const measure = () => {
+      const s = sectionRef.current, b = buttonRef.current;
+      if (!s || !b) return;
+      onFormBottom(Math.round(b.getBoundingClientRect().bottom - s.getBoundingClientRect().top));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(sectionRef.current);
+    return () => observer.disconnect();
+  }, [onFormBottom]);
   const label = "block mb-2 text-[11px] font-mono uppercase tracking-widest text-[var(--k-text-secondary)]";
   const zoneProps = { onFileChange, onSvgChange, t, dragOver, setDragOver };
 
   return (
-    <section className="px-6 py-6 text-[var(--k-text)]">
+    <section ref={sectionRef} className="px-6 py-6 text-[var(--k-text)]">
       <h2 className="font-display text-lg italic mb-5">{t.inputImages}</h2>
 
       <div className="mb-3">
@@ -110,11 +125,12 @@ export default function GenerationForm({
       <EasingSlider curve={curve} onChange={onCurveChange} t={t} />
 
       <button
+        ref={buttonRef}
         onClick={onGenerate}
         disabled={!canGenerate}
         className="w-full py-3 rounded-md bg-[var(--k-text-secondary)] text-white font-mono text-xs uppercase tracking-widest hover:bg-[#5a6268] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {generating ? t.generating : t.generate}
+        {generating ? t.generating : (generateLabel || t.generate)}
       </button>
 
       {resultError && <p className="text-red-600 font-mono text-xs mt-4">{resultError}</p>}
