@@ -3,11 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
-// Client admin : ignore RLS, utilisé uniquement côté serveur
-const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey);
-
 export async function POST(request) {
   try {
+    // Client admin : ignore RLS, utilisé uniquement côté serveur.
+    // Créé à la requête (et non au chargement) pour que le build ne dépende d'aucune clé.
+    const supabaseAdmin = createClient(supabaseUrl, supabaseSecretKey);
+
     const payload = await request.json();
 
     const predictionId = payload.id;

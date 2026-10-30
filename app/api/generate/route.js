@@ -4,10 +4,6 @@ import Replicate from "replicate";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const replicate = new Replicate({
-  auth: process.env.REPLICATE_API_TOKEN,
-});
-
 export async function POST(request) {
   try {
     // --- 1. Authentification : extraire le token envoyé par le frontend ---
@@ -92,6 +88,10 @@ export async function POST(request) {
     }
 
     // --- 7. Déclencher Replicate en mode asynchrone (webhook) ---
+    // Client créé à la requête (et non au chargement) pour que le build ne dépende d'aucune clé.
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
     const webhookUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/api/webhook`;
 
     const prediction = await replicate.predictions.create({
