@@ -1883,14 +1883,38 @@ Format provisoire, **à figer par M7**. Exemple : `exemple_armure/mesures_rendu.
   Sur Modal, il faut `kukan_rerender` (M11, à créer), qui lit l'état d'un travail terminé dans Supabase Storage
   (`kukan-etats`). Tant qu'il n'existe pas, une édition ne peut pas être rendue côté serveur : l'éditeur n'a que
   son aperçu approché.
-- **Appel depuis Next.js** : jamais essayé (M9). Le contrat Python → JavaScript (dict, texte, octets) est à vérifier
-  sur `kukan_verifier_svg` en premier.
+- **Appel depuis Next.js** (M9) : **essayé le 2026-10-30** sur l'aperçu Vercel, SDK JavaScript de Modal (`modal`
+  0.11.1, `lib/modalServer.js`), v20 : HTTP 200 en 6,2 s, `ok: true` (dessin 16:9 de 1672 × 941, 76 traits). Le
+  passage Python → JavaScript (dict, texte, octets) fonctionne. Un nombre réel entier (`1.0`) arrive comme `1`.
 - Ligne de commande (dépôt moteur) : `python -m kukan verifier-svg dessin.svg pose.png --apercu apercu.png`.
-- Réponse de `verifier` :
-  - en cas de succès : `{ok: true, svg_normalise, carre, decalage, sur_encre, couverture_trace, qualite: {global,
-    feux, valeurs}, alertes: [{code, niveau, message, detail, ids}], traits: [{id_source, groupe, segments}],
-    apercu_png (octets)}` ;
+- Réponse de `verifier` (vérifiée sur l'essai réel du 2026-10-30) :
+  - en cas de succès : `{ok: true, svg_normalise, carre, decalage, sur_encre, couverture_trace, zones_non_tracees,
+    qualite: {global, feux, valeurs, reperes_demos_min_med_max}, alertes: [{code, niveau, message, detail, ids}],
+    traits: [{id_source, groupe, segments}], apercu_png (octets)}` ;
   - en cas d'échec : `{ok: false, erreur: {code, niveau, message, detail, ids}}`.
+- Sens et types des champs :
+  | Champ | Type | Sens |
+  |---|---|---|
+  | `svg_normalise` | texte | SVG carré (`viewBox` 0 0 `carre` `carre`), uniquement `M` / `C` ; **sans `id`** sur les `<path>` |
+  | `carre` | entier (px) | côté de la copie carrée |
+  | `decalage` | `[dx, dy]` (px) | position du dessin d'origine dans le carré (16:9 : bande verticale, ex. `[0, 365]`) |
+  | `sur_encre`, `couverture_trace` | nombre de 0 à 1 | proportions (1 = 100 %) |
+  | `zones_non_tracees` | liste | zones de l'encre que le SVG ne couvre pas (vide si tout est tracé) |
+  | `qualite.feux` | `{critère: "vert" \| "orange" \| "rouge"}` | critères `traits`, `longueur_med`, `fragments_pct`, `px_par_segment_med` ; `global` = le pire |
+  | `qualite.valeurs`, `qualite.reperes_demos_min_med_max` | nombres ; `[min, médiane, max]` | mesures du dessin et repères des démos validées. **Les feux sont indicatifs** : un rouge peut venir du dessin ou du format 16:9 ; il ne bloque pas |
+  | `traits[i].id_source` | texte | `id` Krita d'origine (`shapeN`). Perdu dans `svg_normalise`, gardé ici, **dans le même ordre que les `<path>`**. Un `<path>` à plusieurs `M` donne plusieurs traits au **même** `id_source` |
+  | `traits[i].groupe` | texte ou `null` | groupe `<g>` d'origine |
+  | `traits[i].segments` | liste de `[[x, y] × 4]` | Bézier cubiques, en px du carré |
+- **Identifiant stable** (§ 4.5, `<calque>/s-<pose>-<NNN>`) : n'existe que dans un **travail à plusieurs poses**
+  (`kukan_job`), jamais dans la réponse de `verifier`.
+- **Route Next.js `POST /api/svg/verifier`** (branche `claude/e1-verifier-svg`) :
+  - entrée `multipart/form-data` : `svg` (fichier ou texte, ≤ 1,5 Mo), `image` (PNG ou JPEG reconnu à ses premiers
+    octets, ≤ 2,5 Mo), `apercu` (`"0"` pour s'en passer) ; requête entière ≤ 4 Mo (limite Vercel : 4,5 Mo) ;
+  - sortie : la réponse de `verifier`, sauf `apercu_png` remplacé par `apercu_png_base64` (texte ou `null`) ;
+  - codes : 200 `ok: true` ; **422** `ok: false` (corps du moteur + `error_code` = `erreur.code`, `error_message` =
+    `erreur.message`) ; 400 entrée invalide ; 401 non connecté ; 403 compte désactivé ; 413 trop gros ; 415 image
+    qui n'est ni PNG ni JPEG (contrôlée avant le moteur, qui lève une exception sur un fichier qui n'est pas une
+    image) ; 429 trop d'appels (`Retry-After`) ; 502 erreur du moteur ; 503 Modal non configuré ; 504 délai (50 s).
 
 | Route | Entrée | Sortie | Calcul |
 |---|---|---|---|
