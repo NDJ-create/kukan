@@ -6,26 +6,71 @@
 --   - noter les deux UID (Authentication > Users) : UUID_A (compte actuel, free), UUID_B (nouveau compte) ;
 --   - remplacer UUID_A et UUID_B ci-dessous.
 -- Lancer les blocs UN PAR UN et noter le résultat de chacun.
+-- take_api_call n'accepte que verify_svg:minute / 60 et verify_svg:day / 86400 : les essais utilisent la route
+-- du jour avec un petit maximum (2), pour ne pas dépendre d'un changement de minute pendant le test.
 
 -- 1. Limites lues dans plans (tout le monde, comme aujourd'hui). Attendu : 4 lignes, valeurs du lot A.
 select id, verify_svg_daily_limit, concurrent_jobs, max_queued_jobs, concurrent_gpu_passes, gpu_call_timeout_s,
        max_cost_per_job_cents, gpu_seconds_monthly, max_poses_per_job, max_animated_layers, sharing_enabled
 from public.plans order by price_cents, id;
 
--- 2. A prend 3 appels avec un maximum de 2. Attendu : true / true / false (retry_after_s > 0, used = 2).
+-- 2. A prend 3 appels avec un maximum de 2. Attendu : t / 1, t / 2, puis f / 2 (retry_after_s > 0).
+-- 3. B, même route, même fenêtre, dans la même transaction. Attendu : t / 1 (compteurs séparés).
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
-select * from public.take_api_call('test', 2, 3600);
-select * from public.take_api_call('test', 2, 3600);
-select * from public.take_api_call('test', 2, 3600);
--- 3. B, même route, même fenêtre, dans la même transaction. Attendu : true, used = 1 (compteurs séparés).
+select * from public.take_api_call('verify_svg:day', 2, 86400);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_B', 'role', 'authenticated')::text, true);
-select * from public.take_api_call('test', 2, 3600);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
 rollback;
 
--- 4. A essaie de lire ou de modifier api_calls directement. Attendu : ERREUR 42501 à chaque requête
---    (lancer les trois lignes une par une, chacune dans sa transaction).
+-- 4. Attaque « remise à zéro » : A consomme son quota du jour (2 appels), essaie de faire effacer son
+--    compteur avec une fenêtre de 1 s sur la même route, puis appelle à nouveau.
+--    Attendu : t / 1, t / 2 ; NOTICE « attaque refusée : ... couple route / durée non prévu » ;
+--    puis f / 2 (le quota n'est PAS remis à zéro) ; compteur de A : 1 ligne, call_count = 2.
+--    Une variante sur l'autre durée (verify_svg:minute / 60) ne doit pas toucher le compteur du jour.
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
+do $$
+begin
+  perform public.take_api_call('verify_svg:day', 1, 1);
+  raise notice 'attaque ACCEPTÉE (défaut)';
+exception when others then
+  raise notice 'attaque refusée : %', sqlerrm;
+end $$;
+select * from public.take_api_call('verify_svg:minute', 1, 60);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
+reset role;
+select route, window_seconds, call_count from public.api_calls
+where user_id = 'UUID_A' order by route;
+rollback;
+
+-- 5. Couples non prévus. Attendu : 3 NOTICE « refusé : ... couple route / durée non prévu ».
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
+do $$
+declare
+  couple record;
+begin
+  for couple in select * from (values ('test', 3600), ('verify_svg:day', 60), ('verify_svg:minute', 86400)) v(route, secs) loop
+    begin
+      perform public.take_api_call(couple.route, 2, couple.secs);
+      raise notice 'ACCEPTÉ (défaut) : % / %', couple.route, couple.secs;
+    exception when others then
+      raise notice 'refusé : % / % : %', couple.route, couple.secs, sqlerrm;
+    end;
+  end loop;
+end $$;
+rollback;
+
+-- 6. A essaie de lire ou de modifier api_calls directement. Attendu : ERREUR 42501 à chaque requête
+--    (lancer les trois transactions une par une).
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
@@ -41,38 +86,39 @@ rollback;
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
-insert into public.api_calls (user_id, route, window_start, call_count) values ('UUID_A', 'test', now(), 0);
+insert into public.api_calls (user_id, route, window_seconds, window_start, call_count)
+values ('UUID_A', 'verify_svg:day', 86400, now(), 0);
 rollback;
 
--- 5. A essaie de relever son quota dans plans. Attendu : ERREUR 42501.
+-- 7. A essaie de relever son quota dans plans. Attendu : ERREUR 42501.
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
 update public.plans set verify_svg_daily_limit = 999999 where id = 'free';
 rollback;
 
--- 6. Visiteur non connecté (anon) : la fonction lui est fermée. Attendu : ERREUR 42501.
+-- 8. Visiteur non connecté (anon) : la fonction lui est fermée. Attendu : ERREUR 42501.
 begin;
 set local role anon;
-select * from public.take_api_call('test', 2, 3600);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
 rollback;
 
--- 7. Rôle authenticated sans utilisateur (jeton absent). Attendu : ERREUR « utilisateur non connecté ».
+-- 9. Rôle authenticated sans utilisateur (jeton absent). Attendu : ERREUR « utilisateur non connecté ».
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', '{}', true);
-select * from public.take_api_call('test', 2, 3600);
+select * from public.take_api_call('verify_svg:day', 2, 86400);
 rollback;
 
--- 8. Maximum 0 (plan sans droit). Attendu : false, used = 0, rien n'est compté.
+-- 10. Maximum 0 (plan sans droit). Attendu : f / 0, retry_after_s ≤ 60, rien n'est compté.
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
-select * from public.take_api_call('test', 0, 60);
+select * from public.take_api_call('verify_svg:minute', 0, 60);
 rollback;
 
--- 9. Droits réels. Attendu : api_calls false partout pour anon, authenticated, service_role ;
---    take_api_call : execute true pour authenticated seulement.
+-- 11. Droits réels. Attendu : api_calls f partout pour anon, authenticated, service_role ;
+--     take_api_call : execute t pour authenticated seulement.
 select p.droit,
        has_table_privilege('anon', 'public.api_calls', p.droit) as anon,
        has_table_privilege('authenticated', 'public.api_calls', p.droit) as authenticated,
@@ -83,5 +129,5 @@ select r.rolname,
        has_function_privilege(r.rolname, 'public.take_api_call(text, integer, integer)', 'EXECUTE') as execute
 from (values ('anon'), ('authenticated'), ('service_role')) r(rolname);
 
--- 10. Après les essais : la table doit être vide (tout a été annulé). Attendu : 0.
+-- 12. Après les essais : la table doit être vide (tout a été annulé). Attendu : 0.
 select count(*) from public.api_calls;

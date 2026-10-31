@@ -66,17 +66,18 @@ update public.plans set
   max_poses_per_job = null, max_animated_layers = null, sharing_enabled = true
 where id = 'enterprise';
 
--- 2. Compteur d'appels par utilisateur, route et fenêtre -------------------------------------
+-- 2. Compteur d'appels par utilisateur, route et durée de fenêtre ---------------------------
 
 create table public.api_calls (
   user_id uuid not null references auth.users (id) on delete cascade,
   route text not null check (length(route) between 1 and 64),
+  window_seconds integer not null check (window_seconds > 0),
   window_start timestamptz not null,
   call_count integer not null default 0 check (call_count >= 0),
-  primary key (user_id, route, window_start)
+  primary key (user_id, route, window_seconds, window_start)
 );
 
-comment on table public.api_calls is 'Compteur d''appels par utilisateur et fenêtre ; écrit seulement par take_api_call.';
+comment on table public.api_calls is 'Compteur d''appels par utilisateur, route et fenêtre ; écrit seulement par take_api_call.';
 
 alter table public.api_calls enable row level security;
 -- Aucune politique : aucun accès direct. Seule la fonction take_api_call (security definer) y écrit.
@@ -84,8 +85,11 @@ revoke all on table public.api_calls from public, anon, authenticated, service_r
 
 -- 3. Prise atomique d'un appel ---------------------------------------------------------------
 -- Fenêtre fixe alignée sur l'époque Unix (jour = jour UTC). Compte l'appel de auth.uid() s'il reste de la
--- place, sinon refuse sans compter. Le maximum est donné par la route (lu dans plans côté serveur) : un
--- utilisateur qui appellerait la fonction lui-même ne ferait que consommer son propre quota.
+-- place, sinon refuse sans compter.
+-- Seuls les couples route / durée prévus sont acceptés : un utilisateur qui appelle la fonction lui-même
+-- (rpc avec la clé publique) ne peut ni créer d'autres compteurs ni toucher ceux d'une autre durée.
+-- Le maximum est donné par la route (lu dans plans côté serveur) : appeler la fonction soi-même ne fait que
+-- consommer son propre quota.
 
 create function public.take_api_call(p_route text, p_max integer, p_window_seconds integer)
 returns table (allowed boolean, used integer, retry_after_s integer)
@@ -101,18 +105,20 @@ begin
   if v_user is null then
     raise exception 'take_api_call : utilisateur non connecté' using errcode = '42501';
   end if;
-  if p_route is null or length(p_route) not between 1 and 64
-     or p_max is null or p_max < 0
-     or p_window_seconds is null or p_window_seconds not between 1 and 2678400 then
-    raise exception 'take_api_call : arguments invalides' using errcode = '22023';
+  if (p_route, p_window_seconds) is distinct from ('verify_svg:minute', 60)
+     and (p_route, p_window_seconds) is distinct from ('verify_svg:day', 86400) then
+    raise exception 'take_api_call : couple route / durée non prévu' using errcode = '22023';
+  end if;
+  if p_max is null or p_max < 0 then
+    raise exception 'take_api_call : maximum invalide' using errcode = '22023';
   end if;
 
   v_window := to_timestamp(floor(extract(epoch from now()) / p_window_seconds) * p_window_seconds);
 
   if p_max > 0 then
-    insert into public.api_calls as c (user_id, route, window_start, call_count)
-    values (v_user, p_route, v_window, 1)
-    on conflict (user_id, route, window_start)
+    insert into public.api_calls as c (user_id, route, window_seconds, window_start, call_count)
+    values (v_user, p_route, p_window_seconds, v_window, 1)
+    on conflict (user_id, route, window_seconds, window_start)
     do update set call_count = c.call_count + 1
     where c.call_count < p_max
     returning c.call_count into v_count;
@@ -121,7 +127,8 @@ begin
   if v_count is null then
     select c.call_count into v_count
     from public.api_calls c
-    where c.user_id = v_user and c.route = p_route and c.window_start = v_window;
+    where c.user_id = v_user and c.route = p_route and c.window_seconds = p_window_seconds
+      and c.window_start = v_window;
 
     return query select
       false,
@@ -130,9 +137,10 @@ begin
     return;
   end if;
 
-  -- Ménage : fenêtres terminées de cet utilisateur pour cette route.
+  -- Ménage : fenêtres terminées de cet utilisateur, pour cette route ET cette durée seulement.
   delete from public.api_calls c
-  where c.user_id = v_user and c.route = p_route and c.window_start < v_window;
+  where c.user_id = v_user and c.route = p_route and c.window_seconds = p_window_seconds
+    and c.window_start < v_window;
 
   return query select true, v_count, 0;
 end;
