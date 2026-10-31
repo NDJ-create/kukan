@@ -2163,8 +2163,9 @@ transmis au moteur à chaque travail.
 
 **Affichage des quotas (décision du 2026-10-31, page des offres et écran de génération)**
 - Le site parle en **passages estimés** (un passage = deux poses voisines, un calque animé), jamais en secondes de
-  GPU. Le nombre affiché se déduit de `plans.gpu_seconds_monthly` et de la durée d'un passage, en prenant la durée
-  **haute** (ex. 3 600 s → « environ 15 passages » à 240 s par passage, pas plus).
+  GPU. Le nombre affiché se déduit de `plans.gpu_seconds_monthly` et de la durée d'un passage retenue pour les
+  promesses : la **médiane du § 2.4, ≈ 270 s** (démarrage compris), arrondie vers le bas (ex. 3 600 s → « environ
+  13 passages » ; 900 s → « environ 3 passages » ; 14 400 s → « environ 53 passages »).
 - Avant chaque lancement : **l'estimation** (passages, durée, coût, reste du mois), issue du premier temps de
   l'accord GPU (`attente_accord_gpu`). Après : **la consommation réelle**.
 - Aucune promesse que le moteur ne tient pas : pas de « générations illimitées », pas de nombre de générations fixe
@@ -2172,8 +2173,9 @@ transmis au moteur à chaque travail.
 - `plans.monthly_generation_limit` (3 / 55 / 230) appartient à l'ancien parcours Replicate ; il n'est ni cohérent
   avec le budget GPU (55 générations ≫ 3 600 s) ni à afficher comme promesse une fois le GPU branché. Les chiffres
   « 55 » et « 230 » écrits en dur dans `components/PricingCards.js` sont à remplacer en même temps.
-- Durée d'un passage à réconcilier : 150 à 240 s selon l'utilisateur (2026-10-31), 175 à 534 s (médiane ≈ 270 s,
-  démarrage compris) au § 2.4. Le nombre affiché utilise la valeur haute retenue.
+- Durée retenue pour les promesses d'offres (décision du 2026-10-31) : **la médiane du § 2.4, ≈ 270 s**, et non
+  150 à 240 s. Les passages mesurés vont de 175 à 534 s : un dessin dense consomme plus qu'un passage « moyen », ce
+  que l'estimation avant lancement montre.
 | Table | Colonnes | Remarques |
 |---|---|---|
 | `plans` (existante) | + `limites` → une ligne de `plan_limites` | ne pas changer le sens des colonnes existantes |

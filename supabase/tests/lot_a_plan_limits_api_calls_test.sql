@@ -29,8 +29,8 @@ rollback;
 -- 4. Attaque « remise à zéro » : A consomme son quota du jour (2 appels), essaie de faire effacer son
 --    compteur avec une fenêtre de 1 s sur la même route, puis appelle à nouveau.
 --    Attendu : t / 1, t / 2 ; NOTICE « attaque refusée : ... couple route / durée non prévu » ;
---    puis f / 2 (le quota n'est PAS remis à zéro) ; compteur de A : 1 ligne, call_count = 2.
---    Une variante sur l'autre durée (verify_svg:minute / 60) ne doit pas toucher le compteur du jour.
+--    puis t / 1 (route minute, compteur séparé) ; puis f / 2 (le quota du jour n'est PAS remis à zéro) ;
+--    compteurs de A : 2 lignes, verify_svg:day / 86400 / 2 et verify_svg:minute / 60 / 1.
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', 'UUID_A', 'role', 'authenticated')::text, true);
