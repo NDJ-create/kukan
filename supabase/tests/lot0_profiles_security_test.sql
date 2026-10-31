@@ -66,13 +66,26 @@ begin;
 update public.profiles set plan_id = 'studio' where id = 'UUID_A' returning id, plan_id;
 rollback;
 
--- 9. Droits restants de authenticated sur profiles. Attendu : UPDATE seulement sur
---    avatar_icon, dismissed_desktop_notice, hide_inversion_example, is_deactivated.
-select grantee, privilege_type, column_name
-from information_schema.column_privileges
-where table_schema = 'public' and table_name = 'profiles' and grantee in ('anon', 'authenticated')
-  and privilege_type = 'UPDATE'
-order by grantee, column_name;
+-- 9. Droits réels restants sur profiles (has_column_privilege : information_schema peut les sous-estimer).
+--    Attendu : anon false partout ; authenticated true seulement pour avatar_icon, is_deactivated,
+--    hide_inversion_example, dismissed_desktop_notice.
+select r.rolname as role, a.attname as colonne,
+       has_column_privilege(r.rolname, 'public.profiles'::regclass, a.attname, 'UPDATE') as peut_modifier
+from pg_attribute a cross join (values ('anon'), ('authenticated')) r(rolname)
+where a.attrelid = 'public.profiles'::regclass and a.attnum > 0 and not a.attisdropped
+order by r.rolname, a.attnum;
+
+-- 10. Droits réels par table (avant et après la migration).
+select c.relname as table_, p.droit,
+       has_table_privilege('service_role', c.oid, p.droit) as service_role,
+       has_table_privilege('authenticated', c.oid, p.droit) as authenticated,
+       has_table_privilege('anon', c.oid, p.droit) as anon
+from pg_class c
+cross join (values ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) p(droit)
+where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+order by c.relname, p.droit;
+
+select rolname, rolbypassrls from pg_roles where rolname in ('service_role', 'authenticated', 'anon');
 
 -- Ensuite, dans l'application (aperçu ou kukan.pro) avec le compte A :
 --   changer d'avatar (Profil) ; désactiver le compte (Réglages) puis le réactiver. Les deux doivent marcher.
