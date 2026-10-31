@@ -2017,7 +2017,19 @@ avatar_icon, is_deactivated, …)`, `plans(id text : free | independent | studio
 colonnes, fonctions) sont en anglais**, comme l'existant. Le quota de générations fait foi dans
 `plans.monthly_generation_limit` ; `profiles.credits` n'est lu nulle part. `service_role` n'a, par défaut, aucun droit
 SELECT / INSERT / UPDATE / DELETE sur `public` : chaque lot donne les siens, table par table. Migrations dans
-`supabase/migrations/` (lot 0 exécuté le 2026-10-31 ; lot A à relire).
+`supabase/migrations/` (lots 0 et A exécutés et vérifiés le 2026-10-31, test à deux comptes compris).
+
+**Règle d'exécution des lots** (2026-10-31) : « Success. No rows returned » dans le SQL Editor **ne prouve pas**
+qu'une migration a tourné. Chaque lot est suivi de requêtes de vérification (objets créés, valeurs, droits réels par
+`has_table_privilege` / `has_column_privilege` / `has_function_privilege`), puis du test à deux comptes.
+
+**Redirection après confirmation d'inscription** (constat du 2026-10-31) : le lien de confirmation renvoyait vers
+`localhost:3003`. Le code demande `emailRedirectTo = <origine>/dashboard` (`app/signup/page.js`) et
+`redirectTo = <origine>/reset-password` (`app/forgot-password/page.js`) ; une adresse absente de la liste autorisée de
+Supabase est remplacée par le « Site URL ». Réglage : Authentication → URL Configuration, Site URL
+`https://kukan.pro`, adresses autorisées `https://kukan.pro/**` (et les aperçus Vercel s'il faut s'inscrire dessus).
+Il n'y a pas de route `/auth/callback` dans le code : le client navigateur (flux par défaut de `supabase-js`) lit la
+session dans l'adresse au chargement de `/dashboard` ; une route serveur ne sera nécessaire qu'en passant au flux PKCE.
 
 | Nom du cahier (§ 7, § 6) | Nom réel |
 |---|---|
