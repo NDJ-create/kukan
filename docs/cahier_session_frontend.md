@@ -1914,7 +1914,11 @@ Format provisoire, **à figer par M7**. Exemple : `exemple_armure/mesures_rendu.
   - codes : 200 `ok: true` ; **422** `ok: false` (corps du moteur + `error_code` = `erreur.code`, `error_message` =
     `erreur.message`) ; 400 entrée invalide ; 401 non connecté ; 403 compte désactivé ; 413 trop gros ; 415 image
     qui n'est ni PNG ni JPEG (contrôlée avant le moteur, qui lève une exception sur un fichier qui n'est pas une
-    image) ; 429 trop d'appels (`Retry-After`) ; 502 erreur du moteur ; 503 Modal non configuré ; 504 délai (50 s).
+    image) ; 429 `TROP_D_APPELS` (10 par minute) ou `QUOTA_JOUR` (`plans.verify_svg_daily_limit`), avec
+    `Retry-After` ; 502 erreur du moteur ; 503 `MODAL_NON_CONFIGURE` ou `QUOTA_INDISPONIBLE` (compteur ou plan
+    introuvable : l'appel est refusé, jamais laissé passer) ; 504 délai (50 s) ;
+  - quotas : `take_api_call` (Supabase, lot A), compteur commun à toutes les instances ; seules les requêtes valides
+    qui partent vers le moteur sont comptées (pas les 400, 413, 415), y compris celles qui finissent en 422 ou 502.
 
 | Route | Entrée | Sortie | Calcul |
 |---|---|---|---|

@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import { callModal } from "../../../../lib/modalServer";
-import { verifierLimite } from "../../../../lib/rateLimit";
 
 // Vérification d'un SVG d'artiste par le moteur (Modal CPU, kukan_verifier_svg, quelques s, 0 $).
 // Entrée : multipart/form-data avec "svg" (fichier ou texte), "image" (PNG ou JPEG de la pose), "apercu" ("0" pour s'en passer).
@@ -18,8 +17,7 @@ const MAX_REQUETE_OCTETS = 4 * 1024 * 1024;
 const MAX_SVG_OCTETS = 1.5 * 1024 * 1024;
 const MAX_IMAGE_OCTETS = 2.5 * 1024 * 1024;
 const DELAI_MODAL_MS = 50_000;
-const MAX_APPELS = 10;
-const FENETRE_MS = 60_000;
+const MAX_APPELS_MINUTE = 10;
 
 function erreur(status, code, message, extra = {}) {
   return Response.json({ error_code: code, error_message: message, ...extra }, { status });
@@ -58,7 +56,7 @@ export async function POST(request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("is_deactivated")
+      .select("is_deactivated, plans(verify_svg_daily_limit)")
       .eq("id", user.id)
       .single();
 
@@ -66,16 +64,7 @@ export async function POST(request) {
       return erreur(403, "COMPTE_INACTIF", "Compte désactivé ou profil introuvable");
     }
 
-    // --- 3. Limite d'appels par utilisateur ---
-    const limite = verifierLimite(`verifier:${user.id}`, MAX_APPELS, FENETRE_MS);
-    if (!limite.autorise) {
-      return Response.json(
-        { error_code: "TROP_D_APPELS", error_message: `Au plus ${MAX_APPELS} vérifications par minute` },
-        { status: 429, headers: { "Retry-After": String(limite.reessayerDansS) } }
-      );
-    }
-
-    // --- 4. Lire et contrôler les entrées ---
+    // --- 3. Lire et contrôler les entrées ---
     let form;
     try {
       form = await request.formData();
@@ -108,6 +97,39 @@ export async function POST(request) {
     const image = new Uint8Array(await imageField.arrayBuffer());
     if (!estPngOuJpeg(image)) {
       return erreur(415, "IMAGE_FORMAT", "Image PNG ou JPEG attendue");
+    }
+
+    // --- 4. Quotas (Supabase, take_api_call) : seuls les appels qui partent vers le moteur sont comptés ---
+    // La limite du jour vient du plan, lue côté serveur ; le compteur est commun à toutes les instances.
+    const limiteJour = profile.plans?.verify_svg_daily_limit;
+    if (!Number.isInteger(limiteJour)) {
+      return erreur(503, "QUOTA_INDISPONIBLE", "Quota du plan introuvable");
+    }
+
+    const quotas = [
+      { route: "verify_svg:minute", max: MAX_APPELS_MINUTE, secondes: 60, code: "TROP_D_APPELS",
+        message: `Au plus ${MAX_APPELS_MINUTE} vérifications par minute` },
+      { route: "verify_svg:day", max: limiteJour, secondes: 86400, code: "QUOTA_JOUR",
+        message: `Quota du jour atteint (${limiteJour} vérifications)` },
+    ];
+
+    for (const quota of quotas) {
+      const { data, error } = await supabase.rpc("take_api_call", {
+        p_route: quota.route,
+        p_max: quota.max,
+        p_window_seconds: quota.secondes,
+      });
+      const prise = Array.isArray(data) ? data[0] : null;
+      if (error || !prise) {
+        console.error("take_api_call :", error);
+        return erreur(503, "QUOTA_INDISPONIBLE", "Le compteur de quota ne répond pas");
+      }
+      if (!prise.allowed) {
+        return Response.json(
+          { error_code: quota.code, error_message: quota.message, utilises: prise.used },
+          { status: 429, headers: { "Retry-After": String(prise.retry_after_s) } }
+        );
+      }
     }
 
     // --- 5. Appeler le moteur (CPU, sans GPU) ---
