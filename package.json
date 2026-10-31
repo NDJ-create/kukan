@@ -13,6 +13,7 @@
     "dockview-react": "^8.3.1",
     "fabric": "^7.4.0",
     "lucide-react": "^1.31.0",
+    "modal": "0.11.1",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
