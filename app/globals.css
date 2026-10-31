@@ -32,13 +32,12 @@
 
 /* Coche de confirmation (components/SuccessCheck.js) */
 .k-success-check__circle {
-  fill: var(--k-text);
   transform-origin: center;
   animation: k-success-pop 320ms ease-out both;
 }
 .k-success-check__mark {
   fill: none;
-  stroke: var(--k-chrome);
+  stroke: #ffffff;
   stroke-width: 7;
   stroke-linecap: round;
   stroke-linejoin: round;

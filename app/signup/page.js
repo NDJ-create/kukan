@@ -20,11 +20,11 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [error, setError] = useState("");
-  const successTitleRef = useRef(null);
+  const successMessageRef = useRef(null);
 
-  // Le titre du succès prend le focus : le lecteur d'écran l'annonce, le clavier repart de là.
+  // Le message de succès prend le focus : le lecteur d'écran l'annonce, le clavier repart de là.
   useEffect(() => {
-    if (submittedEmail) successTitleRef.current?.focus();
+    if (submittedEmail) successMessageRef.current?.focus();
   }, [submittedEmail]);
 
   const handleSignup = async (e) => {
@@ -113,27 +113,27 @@ export default function SignupPage() {
       <div role="status" aria-live="polite">
         {submittedEmail && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16 }}>
-            <SuccessCheck />
-            <h1
-              ref={successTitleRef}
+            <SuccessCheck color="green" />
+            <p
+              ref={successMessageRef}
               tabIndex={-1}
-              style={{ fontSize: 28, margin: 0, outline: "none", color: "var(--k-text)" }}
+              style={{ margin: 0, fontSize: 18, color: "green", outline: "none" }}
             >
-              {t.signupSuccessTitle}
-            </h1>
-            <p style={{ margin: 0, color: "var(--k-text-secondary)" }}>{t.signupSuccessBody}</p>
+              {t.signupSuccess}
+            </p>
             <p style={{ margin: 0, fontWeight: 600, color: "var(--k-text)", wordBreak: "break-all" }}>{submittedEmail}</p>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--k-text-secondary)" }}>{t.signupSuccessHint}</p>
           </div>
         )}
       </div>
 
       {error && <p role="alert" style={{ color: "red", marginTop: 16 }}>{error}</p>}
 
-      <p style={{ marginTop: 24, fontSize: 14 }}>
-        {lang === "fr" ? "Déjà un compte ?" : "Already have an account?"}{" "}
-        <a href="/login" style={{ textDecoration: "underline" }}>{t.loginButton}</a>
-      </p>
+      {!submittedEmail && (
+        <p style={{ marginTop: 24, fontSize: 14 }}>
+          {lang === "fr" ? "Déjà un compte ?" : "Already have an account?"}{" "}
+          <a href="/login" style={{ textDecoration: "underline" }}>{t.loginButton}</a>
+        </p>
+      )}
     </main>
   );
 }
