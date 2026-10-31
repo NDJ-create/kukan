@@ -30,6 +30,33 @@
   --k-text-secondary: #6C757D;
 }
 
+/* Coche de confirmation (components/SuccessCheck.js) */
+.k-success-check__circle {
+  transform-origin: center;
+  animation: k-success-pop 320ms ease-out both;
+}
+.k-success-check__mark {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: k-success-draw 420ms ease-out 260ms forwards;
+}
+@keyframes k-success-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes k-success-draw {
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .k-success-check__circle { animation: none; }
+  .k-success-check__mark { animation: none; stroke-dashoffset: 0; }
+}
+
 /* Hauteur du haut de page : header seul (mobile), header + barre de menus (ordinateur) */
 :root { --k-top: 32px; }
 @media (min-width: 768px) { :root { --k-top: 64px; } }

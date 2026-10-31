@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { useLanguage } from "../../lib/useLanguage";
 import { translations } from "../../lib/i18n";
 import PasswordInput from "../../components/PasswordInput";
+import SuccessCheck from "../../components/SuccessCheck";
 
 export default function SignupPage() {
   const [lang] = useLanguage();
@@ -17,13 +18,18 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [submittedEmail, setSubmittedEmail] = useState("");
   const [error, setError] = useState("");
+  const successMessageRef = useRef(null);
+
+  // Le message de succès prend le focus : le lecteur d'écran l'annonce, le clavier repart de là.
+  useEffect(() => {
+    if (submittedEmail) successMessageRef.current?.focus();
+  }, [submittedEmail]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
-    setMessage("");
 
     if (password !== confirmPassword) {
       setError(t.passwordMismatch);
@@ -37,7 +43,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { username: username.trim() || null },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
       },
     });
 
@@ -48,7 +54,7 @@ export default function SignupPage() {
       return;
     }
 
-    setMessage(t.signupSuccess);
+    setSubmittedEmail(email);
   };
 
   return (
@@ -60,54 +66,74 @@ export default function SignupPage() {
         ← {t.backToHome}
       </button>
 
-      <h1 style={{ fontSize: 28, marginBottom: 24 }}>{t.signupTitle}</h1>
+      {!submittedEmail && <h1 style={{ fontSize: 28, marginBottom: 24 }}>{t.signupTitle}</h1>}
 
-      <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <input
-          type="email"
-          placeholder={t.emailPlaceholder}
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ padding: 10, fontSize: 16 }}
-        />
-        <PasswordInput
-          placeholder={t.passwordPlaceholder}
-          required
-          minLength={6}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <PasswordInput
-          placeholder={t.confirmPasswordPlaceholder}
-          required
-          minLength={6}
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder={t.usernamePlaceholder}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{ padding: 10, fontSize: 16 }}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          style={{ padding: 12, fontSize: 16, cursor: "pointer" }}
-        >
-          {loading ? t.signupLoading : t.signupButton}
-        </button>
-      </form>
+      {!submittedEmail && (
+        <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <input
+            type="email"
+            placeholder={t.emailPlaceholder}
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ padding: 10, fontSize: 16 }}
+          />
+          <PasswordInput
+            placeholder={t.passwordPlaceholder}
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <PasswordInput
+            placeholder={t.confirmPasswordPlaceholder}
+            required
+            minLength={6}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+          <input
+            type="text"
+            placeholder={t.usernamePlaceholder}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{ padding: 10, fontSize: 16 }}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ padding: 12, fontSize: 16, cursor: "pointer" }}
+          >
+            {loading ? t.signupLoading : t.signupButton}
+          </button>
+        </form>
+      )}
 
-      {message && <p style={{ color: "green", marginTop: 16 }}>{message}</p>}
-      {error && <p style={{ color: "red", marginTop: 16 }}>{error}</p>}
+      {/* Région toujours présente : son contenu est annoncé quand l'inscription réussit. */}
+      <div role="status" aria-live="polite">
+        {submittedEmail && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16 }}>
+            <SuccessCheck color="#43A047" />
+            <p
+              ref={successMessageRef}
+              tabIndex={-1}
+              style={{ margin: 0, fontSize: 18, fontWeight: 400, color: "#2E7D32", outline: "none" }}
+            >
+              {t.signupSuccess}
+            </p>
+            <p style={{ margin: 0, fontWeight: 600, color: "var(--k-text)", wordBreak: "break-all" }}>{submittedEmail}</p>
+          </div>
+        )}
+      </div>
 
-      <p style={{ marginTop: 24, fontSize: 14 }}>
-        {lang === "fr" ? "Déjà un compte ?" : "Already have an account?"}{" "}
-        <a href="/login" style={{ textDecoration: "underline" }}>{t.loginButton}</a>
-      </p>
+      {error && <p role="alert" style={{ color: "red", marginTop: 16 }}>{error}</p>}
+
+      {!submittedEmail && (
+        <p style={{ marginTop: 24, fontSize: 14 }}>
+          {lang === "fr" ? "Déjà un compte ?" : "Already have an account?"}{" "}
+          <a href="/login" style={{ textDecoration: "underline" }}>{t.loginButton}</a>
+        </p>
+      )}
     </main>
   );
 }
