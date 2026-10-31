@@ -2011,6 +2011,25 @@ activé. Les écritures faites par Modal ou par les routes passent par la **clé
 **[À VÉRIFIER — dépôt frontend]** : noms réels des tables existantes (profils, plans, générations, facturation) ;
 adapter les noms ci-dessous avant toute création, et montrer le SQL à l'utilisateur avant de l'exécuter.
 
+**Vérifié (export du 2026-10-31) et décidé** : schéma réel = `profiles(id, plan_id → plans.id, credits, username,
+avatar_icon, is_deactivated, …)`, `plans(id text : free | independent | studio | enterprise, …)`, `generations`,
+`animation_leads` ; buckets publics `generation-inputs`, `generation-outputs`. **Tous les nouveaux noms (tables,
+colonnes, fonctions) sont en anglais**, comme l'existant. Le quota de générations fait foi dans
+`plans.monthly_generation_limit` ; `profiles.credits` n'est lu nulle part. `service_role` n'a, par défaut, aucun droit
+SELECT / INSERT / UPDATE / DELETE sur `public` : chaque lot donne les siens, table par table. Migrations dans
+`supabase/migrations/` (lot 0 exécuté le 2026-10-31 ; lot A à relire).
+
+| Nom du cahier (§ 7, § 6) | Nom réel |
+|---|---|
+| `plan_limites` (table) | colonnes de `plans` : `verify_svg_daily_limit`, `concurrent_jobs`, `max_queued_jobs`, `concurrent_gpu_passes`, `gpu_call_timeout_s`, `max_cost_per_job_cents`, `gpu_seconds_monthly`, `max_poses_per_job`, `max_animated_layers`, `sharing_enabled` (+ existantes `max_intermediates`, `monthly_generation_limit`) |
+| `profiles.plan` | `profiles.plan_id` |
+| `appels_api`, `prendre_appel` | `api_calls`, `take_api_call(route, max, window_seconds)` |
+| `projets`, `projet_membres`, `invitations`, `fichiers` | `projects`, `project_members`, `invitations`, `files` (lots B, C, F) |
+| `travaux`, `travail_evenements`, `artefacts`, `documents`, `usage_gpu` | `jobs`, `job_events`, `artifacts`, `documents`, `gpu_usage` (lot D) |
+| `journaux`, `journal_actions`, `verrous_edition` | `edit_journals`, `edit_journal_actions`, `edit_locks` (lot E) |
+| `role_projet`, `partage_autorise`, `demander_annulation`, `enregistrer_journal`, `prendre_verrou` | `project_role`, `sharing_allowed`, `request_cancel`, `save_journal`, `take_lock` |
+| buckets `kukan-entrees`, `kukan-sorties`, `kukan-etats` | `kukan-inputs`, `kukan-outputs`, `kukan-states` |
+
 ### 7.1 Tables
 | Table | Colonnes principales | Rôle |
 |---|---|---|
