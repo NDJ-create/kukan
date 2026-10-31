@@ -113,11 +113,11 @@ export default function SignupPage() {
       <div role="status" aria-live="polite">
         {submittedEmail && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 16 }}>
-            <SuccessCheck color="green" />
+            <SuccessCheck color="#43A047" />
             <p
               ref={successMessageRef}
               tabIndex={-1}
-              style={{ margin: 0, fontSize: 18, color: "green", outline: "none" }}
+              style={{ margin: 0, fontSize: 18, fontWeight: 400, color: "#2E7D32", outline: "none" }}
             >
               {t.signupSuccess}
             </p>
